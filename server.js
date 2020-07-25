@@ -1,34 +1,63 @@
-// server.js
-// where your node app starts
+// Copyright 2018 Google LLC.
+// SPDX-License-Identifier: Apache-2.0
 
-// we've started you off with Express (https://expressjs.com/)
-// but feel free to use whatever libraries or frameworks you'd like through `package.json`.
-const express = require("express");
+const express = require('express');
 const app = express();
+const receivers = new Map();
 
-// our default array of dreams
-const dreams = [
-  "Find and count some sheep",
-  "Climb a really tall mountain",
-  "Wash the dishes"
-];
+app.set('query parser', 'simple');
 
-// make all the files in 'public' available
-// https://expressjs.com/en/starter/static-files.html
-app.use(express.static("public"));
-
-// https://expressjs.com/en/starter/basic-routing.html
-app.get("/", (request, response) => {
-  response.sendFile(__dirname + "/views/index.html");
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-cache');
+  next();
 });
 
-// send the default array of dreams to the webpage
-app.get("/dreams", (request, response) => {
-  // express helps us take JS objects and send them as JSON
-  response.json(dreams);
+app.post('/send', (req, res) => {
+  const channel = req.query.channel;
+  if (!channel) {
+    res.status(400).send('No channel given');
+    return;
+  }
+  
+  res.status(200);
+  
+  req.on('data', (chunk) => {
+    const set = receivers.get(channel);
+    if (!set) return;
+    for (const res of set) res.write(chunk);
+  });
+  
+  req.on('end', (chunk) => {
+    if (res.writableEnded) return;
+    res.send('Ended');
+  });
 });
 
-// listen for requests :)
-const listener = app.listen(process.env.PORT, () => {
-  console.log("Your app is listening on port " + listener.address().port);
+app.get('/receive', (req, res) => {
+  const channel = req.query.channel;
+  if (!channel) {
+    res.status(400).send('No channel given');
+    return;
+  }
+  
+  if (!receivers.has(channel)) {
+    receivers.set(channel, new Set());
+  }
+  
+  receivers.get(channel).add(res);
+  
+  res.on('close', () => {
+    const set = receivers.get(channel);
+    set.delete(res);
+    if (set.size === 0) receivers.delete(channel);
+  });
+  
+  res.status(200);
+  res.set('Content-Type', 'text/plain');
+});
+
+app.use(express.static('public'));
+
+const listener = app.listen(process.env.PORT, function() {
+  console.log('Your app is listening on port ' + listener.address().port);
 });
