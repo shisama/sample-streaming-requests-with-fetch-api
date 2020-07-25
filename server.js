@@ -26,6 +26,11 @@ app.post('/send', (req, res) => {
   
   req.pipe(writeStream);
   
+  writeStream.on('error', err => {
+    console.log("!!!");
+  });
+  writeStream.close(console.log.bind(null, 'closed'));
+  
   req.on('data', (chunk) => {
     const set = receivers.get(channel);
     if (!set) return;
