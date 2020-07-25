@@ -4,6 +4,7 @@
 const express = require('express');
 const app = express();
 const receivers = new Map();
+const fs = require('fs');
 
 app.set('query parser', 'simple');
 
@@ -21,39 +22,20 @@ app.post('/send', (req, res) => {
   
   res.status(200);
   
+  const writeStream = fs.createWriteStream('./output');
+  
+  req.pipe(writeStream);
+  
   req.on('data', (chunk) => {
     const set = receivers.get(channel);
     if (!set) return;
     for (const res of set) res.write(chunk);
   });
   
-  req.on('end', (chunk) => {
+  req.on('end', async (chunk) => {
     if (res.writableEnded) return;
     res.send('Ended');
   });
-});
-
-app.get('/receive', (req, res) => {
-  const channel = req.query.channel;
-  if (!channel) {
-    res.status(400).send('No channel given');
-    return;
-  }
-  
-  if (!receivers.has(channel)) {
-    receivers.set(channel, new Set());
-  }
-  
-  receivers.get(channel).add(res);
-  
-  res.on('close', () => {
-    const set = receivers.get(channel);
-    set.delete(res);
-    if (set.size === 0) receivers.delete(channel);
-  });
-  
-  res.status(200);
-  res.set('Content-Type', 'text/plain');
 });
 
 app.use(express.static('public'));
