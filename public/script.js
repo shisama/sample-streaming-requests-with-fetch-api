@@ -22,21 +22,21 @@ navigator.getUserMedia({ audio: true, video: { width: 800, height: 600 } },
       body: stream,
       allowHTTP1ForStreamingUpload: true,
     });
-
-    fetch(`/receive?channel=${channel}`).then(async res => {
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) return;
-        var video = document.querySelector('video');
-        video.srcObject = value;
-        video.onloadedmetadata = function(e) {
-          video.play();
-        };
-      }
-    });
   },
   (error) => {
     console.error(error);
   }
 );
+fetch(`/receive?channel=${channel}`).then(async res => {
+  console.log(res.body);
+  const reader = res.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    var video = document.querySelector('video');
+    video.src = URL.createObjectURL(value);
+    video.onloadedmetadata = function(e) {
+      video.play();
+    };
+  }
+});
