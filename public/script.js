@@ -10,14 +10,20 @@ const key = Math.random();
 const stream = new ReadableStream({
   async start(controller) {
     txt.addEventListener("input", async (e) => {
-      controller.enqueue(e.data);
+      const txt = e.data || "";
+      controller.enqueue(txt);
     });
     
     btn.addEventListener("click", async () => {
-      controller.close();
-      
       const res = await fetch(`/receive?key=${key}`);
-      console.log(res.body.toString());
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      while(true) {
+        const {done, value} = await reader.read();
+        if (done) {
+          return;
+        }
+        output.textContent = value;
+      }
     })
   },
 }).pipeThrough(new TextEncoderStream());
@@ -25,4 +31,5 @@ fetch(`/send?key=${key}`, {
   method: 'POST',
   headers: { 'Content-Type': 'text/plain' },
   body: stream,
+  allowHTTP1ForStreamingUpload: true,
 });

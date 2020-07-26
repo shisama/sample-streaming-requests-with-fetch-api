@@ -40,7 +40,6 @@ app.post('/send', (req, res) => {
 
 app.get('/receive', (req, res) => {
   const txt = txtMap.get(req.query.key);
-  console.log("!", txt);
   res.end(txt);
   fs.writeFileSync("output", txt);
 });
