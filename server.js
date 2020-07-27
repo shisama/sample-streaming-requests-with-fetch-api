@@ -1,12 +1,11 @@
 const express = require('express');
 const app = express();
-const receivers = new Map();
 const fs = require('fs');
-const path = require('path');
+
+const txtMap = new Map();
 
 app.set('query parser', 'simple');
 
-const txtMap = new Map();
 
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-cache');
@@ -26,9 +25,11 @@ app.post('/send', (req, res) => {
   res.status(200);
   
   req.on('data', (chunk) => {
-    const char = chunk.toString();
-    const val = (txtMap.get(key) || "") + char;
-    txtMap.set(key, val);
+    const set = txtMap.get(key);
+    if (!set) return;
+    for (const res of set) {
+      res.write(chunk);
+    }
   });
   
   req.on('end', (chunk) => {
@@ -39,9 +40,18 @@ app.post('/send', (req, res) => {
 
 
 app.get('/receive', (req, res) => {
-  const txt = txtMap.get(req.query.key);
-  res.end(txt);
-  fs.writeFileSync("output", txt);
+  const key = req.query.key;
+  if (!txtMap.has(key)) {
+    txtMap.set(key, new Set());
+  }
+  txtMap.get(key).add(res);
+  res.on('close', () => {
+    const set = txtMap.get(key);
+    set.delete(res);
+    if (set.size === 0) txtMap.delete(key);
+  });
+  res.status(200);
+  res.set('Content-Type', 'text/plain');
 });
 
 
